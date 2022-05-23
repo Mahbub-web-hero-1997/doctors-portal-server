@@ -127,9 +127,6 @@ async function run() {
             res.send({ success: true, result });
 
         })
-        app.get('/', async (req, res) => {
-            res.send('Hello world')
-        })
 
     }
     finally {
