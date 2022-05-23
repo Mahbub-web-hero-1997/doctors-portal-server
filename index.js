@@ -19,7 +19,6 @@ function verifyJWT(req, res, next) {
         return res.status(401).send({ message: 'Unauthorize Person' })
     }
     const token = authHeader.split(' ')[1];
-    console.log(token);
     jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (err, decoded) {
         if (err) {
             return res.status(403).send('forbidden access');
@@ -48,17 +47,31 @@ async function run() {
             const users = await userCollection.find().toArray()
             res.send(users)
         })
-        // create Admin
-        app.put('/user/admin/:email', verifyJWT, async (req, res) => {
+        app.get('/admin/:email', async (req, res) => {
             const email = req.params.email;
-            console.log(email);
-            const filter = { email: email }
-            const options = { upsert: true }
-            const updateDoc = {
-                $set: { role: 'admin' },
+            const user = await userCollection.findOne({ email: email });
+            const isAdmin = user.role === 'admin';
+            res.send({ admin: isAdmin })
+
+        })
+        // create Admin
+        app.put('/user/admin/:email', async (req, res) => {
+            const email = req.params.email;
+            const requester = req.params.email;
+            const requesterEmail = await userCollection.findOne({ email: requester })
+            if (requesterEmail.role === 'admin') {
+
+                const filter = { email: email }
+                const updateDoc = {
+                    $set: { role: 'admin' },
+                }
+                const result = await userCollection.updateOne(filter, updateDoc)
+                console.log(result);
+                res.send(result)
             }
-            const result = await userCollection.updateOne(filter, updateDoc, options)
-            res.send(result)
+            else {
+                res.status(403).send('Forbidden')
+            }
         })
         // get user using put method
         app.put('/user/:email', async (req, res) => {
@@ -70,7 +83,7 @@ async function run() {
                 $set: user,
             }
             const result = await userCollection.updateOne(filter, updateDoc, options)
-            const token = jwt.sign({ email: email }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+            const token = jwt.sign({ email: email }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1d' });
             res.send({ result, token: token })
         })
         // get all available services
@@ -92,11 +105,9 @@ async function run() {
             const patientEmail = req.query.patientEmail
             const authorization = req.headers.authorization;
             const decodedEmail = req.decoded?.email;
-            console.log(patientEmail);
-            console.log(decodedEmail);
             if (patientEmail === decodedEmail) {
                 const query = { patientEmail: patientEmail }
-                console.log(query);
+
                 const bookings = await bookingCollection.find(query).toArray()
                 return res.send(bookings)
             }
